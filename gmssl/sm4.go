@@ -89,6 +89,48 @@ import (
 	"unsafe"
 )
 
+const Sm4KeySize = 16
+const Sm4BlockSize = 16
+
+type Sm4 struct {
+	sm4_key *C.SM4_KEY
+	encrypt bool
+}
+
+func NewSm4(key []byte, encrypt bool) (*Sm4, error) {
+	if key == nil {
+		return nil, errors.New("No key")
+	}
+	if len(key) != int(C.SM4_KEY_SIZE) {
+		return nil, errors.New("Invalid key length")
+	}
+	sm4_key := C.malloc(C.sizeof_SM4_KEY)
+	if sm4_key == nil {
+		return nil, errors.New("Malloc failure")
+	}
+	ret := &Sm4{(*C.SM4_KEY)(unsafe.Pointer(sm4_key)), encrypt}
+	runtime.SetFinalizer(ret, func(ret *Sm4) {
+		C.free(unsafe.Pointer(ret.sm4_key))
+	})
+	ret.encrypt = encrypt
+	if encrypt == true {
+		C.sm4_set_encrypt_key((*C.SM4_KEY)(unsafe.Pointer(sm4_key)), (*C.uchar)(&key[0]))
+	} else {
+		C.sm4_set_decrypt_key((*C.SM4_KEY)(unsafe.Pointer(sm4_key)), (*C.uchar)(&key[0]))
+	}
+	return ret, nil
+}
+
+func (sm4 *Sm4) Encrypt(in []byte) ([]byte, error) {
+	if len(in) != int(C.SM4_BLOCK_SIZE) {
+		return nil, errors.New("Invalid block size")
+	}
+	outbuf := make([]byte, C.SM4_BLOCK_SIZE)
+	C.sm4_encrypt((*C.SM4_KEY)(unsafe.Pointer(sm4.sm4_key)), (*C.uchar)(&in[0]), (*C.uchar)(unsafe.Pointer(&outbuf[0])))
+	return outbuf, nil
+}
+
+const Sm4CbcIvSize = 16
 
 type SM4CBCContext struct {
 	sm4_cbc_ctx *C.SM4_CBC_CTX

@@ -15,6 +15,7 @@ package gmssl
 #include <string.h>
 #include <gmssl/sm3.h>
 #include <gmssl/mem.h>
+#include <gmssl/pbkdf2.h>
 #include <gmssl/error.h>
 
 SM3_CTX *sm3_ctx_new(void) {
@@ -57,9 +58,14 @@ import (
 	"runtime"
 )
 
+const Sm3DigestSize = 32
+
+
+
 type SM3Context struct {
 	sm3_ctx *C.SM3_CTX
 }
+
 
 func NewSM3Context() (*SM3Context, error) {
 	sm3_ctx := C.sm3_ctx_new()
@@ -93,6 +99,9 @@ func (ctx *SM3Context) Reset() error {
 	return nil
 }
 
+const Sm3HmacMinKeySize = 16
+const Sm3HmacMaxKeySize = 64
+const Sm3HmacSize = 32
 
 type SM3HMACContext struct {
 	sm3_hmac_ctx *C.SM3_HMAC_CTX
@@ -135,3 +144,27 @@ func (ctx *SM3HMACContext) Reset(key []byte) error {
 	C.sm3_hmac_init(ctx.sm3_hmac_ctx, (*C.uchar)(unsafe.Pointer(&key[0])), C.size_t(len(key)))
 	return nil
 }
+
+
+const Sm3Pbkdf2MinIter = 10000
+const Sm3Pbkdf2MaxIter = 16777216
+const Sm3Pbkdf2MaxSaltSize = 64
+const Sm3Pbkdf2DefaultSaltSize = 8
+const Sm3Pbkdf2MaxKeySize = 256
+
+
+func Sm3Pbkdf2(pass string, salt []byte, iter uint, keylen uint) ([]byte, error) {
+
+	pass_str := C.CString(pass)
+	defer C.free(unsafe.Pointer(pass_str))
+
+	keybuf := make([]byte, keylen)
+
+	C.pbkdf2_hmac_sm3_genkey(pass_str, C.strlen(pass_str),
+		(*C.uchar)(unsafe.Pointer(&salt[0])), C.size_t(len(salt)),
+		C.size_t(iter), C.size_t(keylen),
+		(*C.uchar)(unsafe.Pointer(&keybuf[0])))
+
+	return keybuf, nil
+}
+
