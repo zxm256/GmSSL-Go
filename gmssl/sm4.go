@@ -203,7 +203,7 @@ type SM4CTRContext struct {
 	sm4_ctr_ctx *C.SM4_CTR_CTX
 }
 
-func NewSM4CTRContext(key []byte, iv []byte, encrypt bool) (*SM4CTRContext, error) {
+func NewSM4CTRContext(key []byte, iv []byte) (*SM4CTRContext, error) {
 	if key == nil {
 		return nil, errors.New("No key")
 	}
@@ -245,6 +245,12 @@ func (ctx *SM4CTRContext) Finish() ([]byte, error) {
 	return outbuf[:outlen], nil
 }
 
+
+const Sm4GcmMinIvSize = 8
+const Sm4GcmMaxIvSize = 64
+const Sm4GcmDefaultIvSize = 64
+const Sm4GcmDefaultTagSize = 16
+const Sm4GcmMaxTagSize = 16
 
 type SM4GCMContext struct {
 	sm4_gcm_ctx *C.SM4_GCM_CTX
@@ -299,7 +305,7 @@ func (ctx *SM4GCMContext) Update(in []byte) ([]byte, error) {
 }
 
 func (ctx *SM4GCMContext) Finish() ([]byte, error) {
-	outbuf := make([]byte, C.SM4_BLOCK_SIZE)
+	outbuf := make([]byte, C.SM4_BLOCK_SIZE*2) // FIXME: prepare different size of enc/dec,  enc need larger
 	var outlen C.size_t
 	if ctx.encrypt {
 		if 1 != C.sm4_gcm_encrypt_finish(ctx.sm4_gcm_ctx, (*C.uchar)(&outbuf[0]), &outlen) {
