@@ -113,4 +113,34 @@ func main() {
 	zuc_plaintext_last, _ := zuc.Finish()
 	zuc_plaintext = append(zuc_plaintext, zuc_plaintext_last...)
 	fmt.Printf("plaintext = %x\n", zuc_plaintext)
+
+	fmt.Printf("Sm2DefaultId = %s\n", gmssl.Sm2DefaultId)
+	fmt.Printf("Sm2MaxSignatureSize = %d\n", gmssl.Sm2MaxSignatureSize)
+	fmt.Printf("Sm2MinPlaintextSize = %d\n", gmssl.Sm2MinPlaintextSize)
+	fmt.Printf("Sm2MaxPlaintextSize = %d\n", gmssl.Sm2MaxPlaintextSize)
+	fmt.Printf("Sm2MinCiphertextSize = %d\n", gmssl.Sm2MinCiphertextSize)
+	fmt.Printf("Sm2MaxCiphertextSize = %d\n", gmssl.Sm2MaxCiphertextSize)
+
+	sm2, _ := gmssl.GenerateSm2Key()
+	sm2.ExportEncryptedPrivateKeyInfoPem("Password", "sm2.pem")
+	sm2.ExportPublicKeyInfoPem("sm2pub.pem")
+	sm2pri, _ := gmssl.ImportSm2EncryptedPrivateKeyInfoPem("Password", "sm2.pem")
+	sm2pub, _ := gmssl.ImportSm2PublicKeyInfoPem("sm2pub.pem")
+	z, _ := sm2pub.ComputeZ(gmssl.Sm2DefaultId)
+	fmt.Printf("Z = %x\n", z)
+	Z, _ := sm2pri.ComputeZ(gmssl.Sm2DefaultId)
+	fmt.Printf("Z = %x\n", Z)
+
+	signature, _ := sm2pri.Sign(dgst)
+	fmt.Printf("Signature = %x\n", signature)
+	ret := sm2pub.Verify(dgst, signature)
+	fmt.Print("Verify success = ", ret, "\n")
+
+	sm2_ciphertext, _ := sm2pub.Encrypt([]byte("abc"))
+	sm2_plaintext, _ := sm2pri.Decrypt(sm2_ciphertext)
+	fmt.Printf("SM2 Ciphertext : %x\n", sm2_ciphertext)
+	fmt.Printf("SM2 Plaintext : %s\n", sm2_plaintext)
 }
+
+
+
