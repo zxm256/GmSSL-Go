@@ -186,8 +186,29 @@ func main() {
 	sm9_verify_ret := sm9_verify.Verify(sm9_signature, sm9_sign_master_pub, "Alice")
 	fmt.Print("Sm9 Verify success : ", sm9_verify_ret, "\n")
 
+	cert, _ := gmssl.ImportSm2CertificatePem("ROOTCA.pem")
+	serial, _ := cert.GetSerialNumber()
+	fmt.Printf("SerialNumber : %x\n", serial)
+
+	not_before, not_after, _ := cert.GetValidity()
+	fmt.Println("NotBefore : ", not_before)
+	fmt.Println("NotAfter : ", not_after)
 
 
+	issuer_raw, issuer, _ := cert.GetIssuer()
+	fmt.Println("Issuer: ", issuer)
+	fmt.Printf("Issuer (raw) : %x\n", issuer_raw)
+
+	subject_raw, subject, _ := cert.GetSubject()
+	fmt.Println("Subject: ", subject)
+	fmt.Printf("Subject (raw) : %x\n", subject_raw)
+
+
+	subject_public_key, _ := cert.GetSubjectPublicKey()
+	subject_public_key.ExportPublicKeyInfoPem("subject_public_key.pem")
+
+	cert_verify_ret := cert.VerifyByCaCertificate(cert, gmssl.Sm2DefaultId)
+	fmt.Println("Cert Verify success : ", cert_verify_ret)
 
 }
 
