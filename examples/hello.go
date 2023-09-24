@@ -140,6 +140,55 @@ func main() {
 	sm2_plaintext, _ := sm2pri.Decrypt(sm2_ciphertext)
 	fmt.Printf("SM2 Ciphertext : %x\n", sm2_ciphertext)
 	fmt.Printf("SM2 Plaintext : %s\n", sm2_plaintext)
+
+	fmt.Printf("Sm9MaxIdSize = %d\n", gmssl.Sm9MaxIdSize)
+	fmt.Printf("Sm9MaxPlaintextSize = %d\n", gmssl.Sm9MaxPlaintextSize)
+	fmt.Printf("Sm9MaxCiphertextSize = %d\n", gmssl.Sm9MaxCiphertextSize)
+	fmt.Printf("Sm9SignatureSize = %d\n", gmssl.Sm9SignatureSize)
+
+	sm9_enc_master, _ := gmssl.GenerateSm9EncMasterKey()
+	sm9_enc_master.ExportEncryptedMasterKeyInfoPem("sm9enc.pem", "password")
+	sm9_enc_master.ExportMasterPublicKeyPem("sm9encpub.pem")
+
+	sm9_enc_master, _ = gmssl.ImportEncryptedSm9EncMasterKeyInfoPem("sm9enc.pem", "password")
+	sm9_enc_master_pub, _ := gmssl.ImportSm9EncMasterPublicKeyPem("sm9encpub.pem")
+
+	sm9_ciphertext, _ := sm9_enc_master_pub.Encrypt([]byte("plaintext"), "Alice")
+	fmt.Printf("SM9 Ciphertext : %x\n", sm9_ciphertext)
+
+	sm9_enc_key, _ := sm9_enc_master.ExtractKey("Alice")
+	fmt.Printf("Id : %s\n", sm9_enc_key.GetId())
+	sm9_enc_key.ExportEncryptedPrivateKeyInfoPem("sm9encpri.pem", "password")
+	sm9_enc_key, _ = gmssl.ImportEncryptedSm9EncPrivateKeyInfoPem("sm9encpri.pem", "password", "Alice")
+
+	sm9_plaintext, _ := sm9_enc_key.Decrypt(sm9_ciphertext)
+	fmt.Printf("SM9 Plaintext : %s\n", sm9_plaintext)
+
+	sm9_sign_master, _ := gmssl.GenerateSm9SignMasterKey()
+	sm9_sign_master.ExportEncryptedMasterKeyInfoPem("sm9sign.pem", "password")
+	sm9_sign_master.ExportMasterPublicKeyPem("sm9signpub.pem")
+
+	sm9_sign_master, _ = gmssl.ImportEncryptedSm9SignMasterKeyInfoPem("sm9sign.pem", "password")
+	sm9_sign_master_pub, _ := gmssl.ImportSm9SignMasterPublicKeyPem("sm9signpub.pem")
+
+	sm9_sign_key, _ := sm9_sign_master.ExtractKey("Alice")
+	fmt.Printf("Id : %s\n", sm9_sign_key.GetId())
+	sm9_sign_key.ExportEncryptedPrivateKeyInfoPem("sm9signpri.pem", "password")
+	sm9_sign_key, _ = gmssl.ImportEncryptedSm9SignPrivateKeyInfoPem("sm9signpri.pem", "password", "Alice")
+
+	sm9_sign, _ := gmssl.NewSm9Signature(true)
+	sm9_sign.Update([]byte("abc"))
+	sm9_signature, _ := sm9_sign.Sign(sm9_sign_key)
+	fmt.Printf("SM9 Signature : %x\n", sm9_signature)
+
+	sm9_verify, _ := gmssl.NewSm9Signature(false)
+	sm9_verify.Update([]byte("abc"))
+	sm9_verify_ret := sm9_verify.Verify(sm9_signature, sm9_sign_master_pub, "Alice")
+	fmt.Print("Sm9 Verify success : ", sm9_verify_ret, "\n")
+
+
+
+
 }
 
 
