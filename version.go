@@ -15,7 +15,7 @@ package gmssl
 import "C"
 
 const (
-	GmSSLGoVersion = "2.1.0"
+	GmSSLGoVersion = "2.1.1"
 )
 
 func GetGmSSLLibraryVersion() string {
