@@ -11,8 +11,6 @@
 package gmssl
 
 /*
-#cgo darwin CFLAGS: -I/usr/local/include
-#cgo darwin LDFLAGS: -L/usr/local/lib -lgmssl
-
+#cgo LDFLAGS: -lgmssl
 */
 import "C"
