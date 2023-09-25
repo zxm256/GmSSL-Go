@@ -185,6 +185,7 @@ func main() {
 	sm9_verify_ret := sm9_verify.Verify(sm9_signature, sm9_sign_master_pub, "Alice")
 	fmt.Print("Sm9 Verify success : ", sm9_verify_ret, "\n")
 
+	/*
 	cert, _ := gmssl.ImportSm2CertificatePem("ROOTCA.pem")
 	serial, _ := cert.GetSerialNumber()
 	fmt.Printf("SerialNumber : %x\n", serial)
@@ -208,7 +209,7 @@ func main() {
 
 	cert_verify_ret := cert.VerifyByCaCertificate(cert, gmssl.Sm2DefaultId)
 	fmt.Println("Cert Verify success : ", cert_verify_ret)
-
+	*/
 }
 
 
