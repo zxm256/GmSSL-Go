@@ -19,8 +19,6 @@ import "C"
 
 import (
 	"errors"
-	"runtime"
-	"unsafe"
 )
 
 const ZucKeySize = 16
@@ -28,7 +26,7 @@ const ZucIvSize = 16
 
 
 type Zuc struct {
-	zuc_ctx *C.ZUC_CTX
+	zuc_ctx C.ZUC_CTX
 }
 
 func NewZuc(key []byte, iv []byte) (*Zuc, error) {
@@ -41,24 +39,19 @@ func NewZuc(key []byte, iv []byte) (*Zuc, error) {
 	if len(iv) != int(C.ZUC_IV_SIZE) {
 		return nil, errors.New("Invalid IV length")
 	}
-	zuc_ctx := C.malloc(C.sizeof_ZUC_CTX)
-	if zuc_ctx == nil {
-		return nil, errors.New("Malloc failure")
-	}
-	ret := &Zuc{(*C.ZUC_CTX)(unsafe.Pointer(zuc_ctx))}
-	runtime.SetFinalizer(ret, func(ret *Zuc) {
-		C.free(unsafe.Pointer(ret.zuc_ctx))
-	})
-	if 1 != C.zuc_encrypt_init((*C.ZUC_CTX)(unsafe.Pointer(zuc_ctx)), (*C.uchar)(&key[0]), (*C.uchar)(&iv[0])) {
+
+	zuc := new(Zuc)
+
+	if 1 != C.zuc_encrypt_init(&zuc.zuc_ctx, (*C.uchar)(&key[0]), (*C.uchar)(&iv[0])) {
 		return nil, errors.New("Libgmssl inner error")
 	}
-	return ret, nil
+	return zuc, nil
 }
 
 func (zuc *Zuc) Update(in []byte) ([]byte, error) {
 	outbuf := make([]byte, len(in) + 16)
 	var outlen C.size_t
-	if 1 != C.zuc_encrypt_update(zuc.zuc_ctx, (*C.uchar)(&in[0]), C.size_t(len(in)), (*C.uchar)(&outbuf[0]), &outlen) {
+	if 1 != C.zuc_encrypt_update(&zuc.zuc_ctx, (*C.uchar)(&in[0]), C.size_t(len(in)), (*C.uchar)(&outbuf[0]), &outlen) {
 		return nil, errors.New("Libgmssl inner error")
 	}
 	return outbuf[:outlen], nil
@@ -67,9 +60,8 @@ func (zuc *Zuc) Update(in []byte) ([]byte, error) {
 func (zuc *Zuc) Finish() ([]byte, error) {
 	outbuf := make([]byte, 16)
 	var outlen C.size_t
-	if 1 != C.zuc_encrypt_finish(zuc.zuc_ctx, (*C.uchar)(&outbuf[0]), &outlen) {
+	if 1 != C.zuc_encrypt_finish(&zuc.zuc_ctx, (*C.uchar)(&outbuf[0]), &outlen) {
 		return nil, errors.New("Libgmssl inner error")
 	}
-	return outbuf[:2], nil
-	//return outbuf[:outlen], nil
+	return outbuf[:outlen], nil
 }

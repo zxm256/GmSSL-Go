@@ -6,27 +6,26 @@ import (
 )
 
 func main() {
-	version := gmssl.GetVersions()
-	fmt.Printf("GmSSL-Go Version: %s\n", version[0])
-	fmt.Printf("GmSSL Library Version: %s\n", version[1])
+	fmt.Printf("GmSSL-Go Version: %s\n", gmssl.GmSSLGoVersion)
+	fmt.Printf("GmSSL Library Version: %s\n", gmssl.GetGmSSLLibraryVersion())
 
 	key, _ := gmssl.RandBytes(16)
 	fmt.Printf("RandBytes(32) : %x\n", key)
 
 	fmt.Printf("Sm3DigestSize : %d\n", gmssl.Sm3DigestSize)
 
-	sm3, _ := gmssl.NewSM3Context()
+	sm3 := gmssl.NewSm3()
 	sm3.Update([]byte("abc"))
-	dgst, _ := sm3.Finish()
+	dgst := sm3.Digest()
 	fmt.Printf("Sm3('abc') : %x\n", dgst)
 
 	fmt.Printf("Sm3HmacMinKeySize = %d\n", gmssl.Sm3HmacMinKeySize)
 	fmt.Printf("Sm3HmacMaxKeySize = %d\n", gmssl.Sm3HmacMaxKeySize)
 	fmt.Printf("Sm3HmacSize = %d\n", gmssl.Sm3HmacSize)
 
-	hmac, _ := gmssl.NewSM3HMACContext(key)
+	hmac, _ := gmssl.NewSm3Hmac(key)
 	hmac.Update([]byte("abc"))
-	mac, _ := hmac.Finish()
+	mac := hmac.GenerateMac()
 	fmt.Printf("Sm3Hmac('abc') : %x\n", mac)
 
 	fmt.Printf("Sm3Pbkdf2MinIter = %d\n", gmssl.Sm3Pbkdf2MinIter)
@@ -55,24 +54,24 @@ func main() {
 	fmt.Printf("Sm4CbcIvSize = %d\n", gmssl.Sm4CbcIvSize)
 	iv, _ := gmssl.RandBytes(gmssl.Sm4CbcIvSize)
 
-	sm4_cbc_enc, _ := gmssl.NewSM4CBCContext(key, iv, true)
+	sm4_cbc_enc, _ := gmssl.NewSm4Cbc(key, iv, true)
 	cbc_ciphertext, _ := sm4_cbc_enc.Update([]byte("abc"))
 	cbc_ciphertext_last, _ := sm4_cbc_enc.Finish()
 	cbc_ciphertext = append(cbc_ciphertext, cbc_ciphertext_last...)
 	fmt.Printf("ciphertext = %x\n", cbc_ciphertext)
-	sm4_cbc_dec, _ := gmssl.NewSM4CBCContext(key, iv, false)
+	sm4_cbc_dec, _ := gmssl.NewSm4Cbc(key, iv, false)
 	cbc_plaintext, _ := sm4_cbc_dec.Update(cbc_ciphertext)
 	cbc_plaintext_last, _ := sm4_cbc_dec.Finish()
 	cbc_plaintext = append(cbc_plaintext, cbc_plaintext_last...)
 	fmt.Printf("plaintext = %x\n", cbc_plaintext)
 
-	sm4_ctr, _ := gmssl.NewSM4CTRContext(key, iv)
+	sm4_ctr, _ := gmssl.NewSm4Ctr(key, iv)
 	ctr_ciphertext, _ := sm4_ctr.Update([]byte("abc"))
 	ctr_ciphertext_last, _ := sm4_ctr.Finish()
 	ctr_ciphertext = append(ctr_ciphertext, ctr_ciphertext_last...)
 	fmt.Printf("ciphertext = %x\n", ctr_ciphertext)
 
-	sm4_ctr, _ = gmssl.NewSM4CTRContext(key, iv)
+	sm4_ctr, _ = gmssl.NewSm4Ctr(key, iv)
 	ctr_plaintext, _ := sm4_ctr.Update(ctr_ciphertext)
 	ctr_plaintext_last, _ := sm4_ctr.Finish()
 	ctr_plaintext = append(ctr_plaintext, ctr_plaintext_last...)
@@ -88,12 +87,12 @@ func main() {
 	taglen := gmssl.Sm4GcmDefaultTagSize
 	iv, _ = gmssl.RandBytes(gmssl.Sm4GcmDefaultIvSize)
 
-	sm4_gcm_enc, _ := gmssl.NewSM4GCMContext(key, iv, aad, taglen, true)
+	sm4_gcm_enc, _ := gmssl.NewSm4Gcm(key, iv, aad, taglen, true)
 	gcm_ciphertext, _ := sm4_gcm_enc.Update([]byte("abc"))
 	gcm_ciphertext_last, _ := sm4_gcm_enc.Finish()
 	gcm_ciphertext = append(gcm_ciphertext, gcm_ciphertext_last...)
 	fmt.Printf("ciphertext = %x\n", gcm_ciphertext)
-	sm4_gcm_dec, _ := gmssl.NewSM4GCMContext(key, iv, aad, taglen, false)
+	sm4_gcm_dec, _ := gmssl.NewSm4Gcm(key, iv, aad, taglen, false)
 	gcm_plaintext, _ := sm4_gcm_dec.Update(gcm_ciphertext)
 	gcm_plaintext_last, _ := sm4_gcm_dec.Finish()
 	gcm_plaintext = append(gcm_plaintext, gcm_plaintext_last...)

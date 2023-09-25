@@ -22,7 +22,6 @@ import "C"
 import (
 	"unsafe"
 	"errors"
-	"runtime"
 )
 
 
@@ -37,24 +36,18 @@ const (
 
 
 type Sm2Key struct {
-	sm2_key *C.SM2_KEY
+	sm2_key C.SM2_KEY
 	has_private_key bool
 }
 
 func GenerateSm2Key() (*Sm2Key, error) {
+	ret := new(Sm2Key)
 
-	sm2_key := (*C.SM2_KEY)(unsafe.Pointer(C.malloc(C.sizeof_SM2_KEY)))
-	if sm2_key == nil {
-		return nil, errors.New("Malloc failure")
-	}
-	ret := &Sm2Key{sm2_key, true}
-	runtime.SetFinalizer(ret, func(ret *Sm2Key) {
-		C.free(unsafe.Pointer(ret.sm2_key))
-	})
-
-	if C.sm2_key_generate(sm2_key) != 1{
+	if C.sm2_key_generate(&ret.sm2_key) != 1{
 		return nil, errors.New("Libgmssl inner error")
 	}
+	ret.has_private_key = true
+
 	return ret, nil
 }
 
@@ -72,18 +65,13 @@ func ImportSm2EncryptedPrivateKeyInfoPem(pass string, path string) (*Sm2Key, err
 	}
 	defer C.fclose(fp)
 
-	sm2_key := (*C.SM2_KEY)(unsafe.Pointer(C.malloc(C.sizeof_SM2_KEY)))
-	if sm2_key == nil {
-		return nil, errors.New("Malloc failure")
-	}
-	ret := &Sm2Key{sm2_key, true}
-	runtime.SetFinalizer(ret, func(ret *Sm2Key) {
-		C.free(unsafe.Pointer(ret.sm2_key))
-	})
+	ret := new(Sm2Key)
 
-	if C.sm2_private_key_info_decrypt_from_pem(sm2_key, pass_str, fp) != 1 {
+	if C.sm2_private_key_info_decrypt_from_pem(&ret.sm2_key, pass_str, fp) != 1 {
 		return nil, errors.New("Libgmssl inner error")
 	}
+	ret.has_private_key = true
+
 	return ret, nil
 }
 
@@ -98,18 +86,13 @@ func ImportSm2PublicKeyInfoPem(path string) (*Sm2Key, error) {
 	}
 	defer C.fclose(fp)
 
-	sm2_key := (*C.SM2_KEY)(unsafe.Pointer(C.malloc(C.sizeof_SM2_KEY)))
-	if sm2_key == nil {
-		return nil, errors.New("Malloc failure")
-	}
-	ret := &Sm2Key{sm2_key, false}
-	runtime.SetFinalizer(ret, func(ret *Sm2Key) {
-		C.free(unsafe.Pointer(ret.sm2_key))
-	})
+	ret := new(Sm2Key)
 
-	if C.sm2_public_key_info_from_pem(sm2_key, fp) != 1 {
+	if C.sm2_public_key_info_from_pem(&ret.sm2_key, fp) != 1 {
 		return nil, errors.New("Libgmssl inner error")
 	}
+	ret.has_private_key = false
+
 	return ret, nil
 }
 
@@ -131,7 +114,7 @@ func (sm2 *Sm2Key) ExportEncryptedPrivateKeyInfoPem(pass string, path string) er
 	}
 	defer C.fclose(fp)
 
-	if C.sm2_private_key_info_encrypt_to_pem(sm2.sm2_key, pass_str, fp) != 1 {
+	if C.sm2_private_key_info_encrypt_to_pem(&sm2.sm2_key, pass_str, fp) != 1 {
 		return errors.New("Libgmssl inner error")
 	}
 	return nil
@@ -147,7 +130,7 @@ func (sm2 *Sm2Key) ExportPublicKeyInfoPem(path string) error {
 	}
 	defer C.fclose(fp)
 
-	if C.sm2_public_key_info_to_pem(sm2.sm2_key, fp) != 1 {
+	if C.sm2_public_key_info_to_pem(&sm2.sm2_key, fp) != 1 {
 		return errors.New("Libgmssl inner error")
 	}
 	return nil
@@ -172,7 +155,7 @@ func (sm2 *Sm2Key) Sign(dgst []byte) ([]byte, error) {
 	sig := make([]byte, C.SM2_MAX_SIGNATURE_SIZE)
 	var siglen C.size_t
 
-	if C.sm2_sign(sm2.sm2_key, (*C.uchar)(&dgst[0]), (*C.uchar)(&sig[0]), &siglen) != 1 {
+	if C.sm2_sign(&sm2.sm2_key, (*C.uchar)(&dgst[0]), (*C.uchar)(&sig[0]), &siglen) != 1 {
 		return nil, errors.New("Libgmssl inner error")
 	}
 	return sig[:siglen], nil
@@ -182,7 +165,7 @@ func (sm2 *Sm2Key) Verify(dgst []byte, signature []byte) bool {
 	if len(dgst) != C.SM3_DIGEST_SIZE {
 		return false
 	}
-	if 1 != C.sm2_verify(sm2.sm2_key, (*C.uchar)(&dgst[0]), (*C.uchar)(&signature[0]), C.size_t(len(signature))) {
+	if 1 != C.sm2_verify(&sm2.sm2_key, (*C.uchar)(&dgst[0]), (*C.uchar)(&signature[0]), C.size_t(len(signature))) {
 		return false
 	}
 	return true
@@ -191,7 +174,7 @@ func (sm2 *Sm2Key) Verify(dgst []byte, signature []byte) bool {
 func (sm2 *Sm2Key) Encrypt(in []byte) ([]byte, error) {
 	outbuf := make([]byte, C.SM2_MAX_CIPHERTEXT_SIZE)
 	var outlen C.size_t
-	if C.sm2_encrypt(sm2.sm2_key, (*C.uchar)(&in[0]), C.size_t(len(in)), (*C.uchar)(&outbuf[0]), &outlen) != 1 {
+	if C.sm2_encrypt(&sm2.sm2_key, (*C.uchar)(&in[0]), C.size_t(len(in)), (*C.uchar)(&outbuf[0]), &outlen) != 1 {
 		return nil, errors.New("Libgmssl inner error")
 	}
 	return outbuf[:outlen], nil
@@ -203,7 +186,7 @@ func (sm2 *Sm2Key) Decrypt(in []byte) ([]byte, error) {
 	}
 	outbuf := make([]byte, C.SM2_MAX_PLAINTEXT_SIZE)
 	var outlen C.size_t
-	if C.sm2_decrypt(sm2.sm2_key, (*C.uchar)(&in[0]), C.size_t(len(in)), (*C.uchar)(&outbuf[0]), &outlen) != 1 {
+	if C.sm2_decrypt(&sm2.sm2_key, (*C.uchar)(&in[0]), C.size_t(len(in)), (*C.uchar)(&outbuf[0]), &outlen) != 1 {
 		return nil, errors.New("Libgmssl inner error")
 	}
 	return outbuf[:outlen], nil
@@ -211,7 +194,7 @@ func (sm2 *Sm2Key) Decrypt(in []byte) ([]byte, error) {
 
 
 type Sm2Signature struct {
-	sm2_sign_ctx *C.SM2_SIGN_CTX
+	sm2_sign_ctx C.SM2_SIGN_CTX
 	sign bool
 }
 
@@ -226,24 +209,19 @@ func NewSm2Signature(sm2 *Sm2Key, id string, sign bool) (*Sm2Signature, error) {
 		}
 	}
 
-	sm2_sign_ctx := (*C.SM2_SIGN_CTX)(unsafe.Pointer(C.malloc(C.sizeof_SM2_SIGN_CTX)))
-	if sm2_sign_ctx == nil {
-		return nil, errors.New("Malloc failure")
-	}
-	ret := &Sm2Signature{sm2_sign_ctx, sign}
-	runtime.SetFinalizer(ret, func(ret *Sm2Signature) {
-		C.free(unsafe.Pointer(ret.sm2_sign_ctx))
-	})
+	ret := new(Sm2Signature)
 
 	if sign == true {
-		if C.sm2_sign_init(sm2_sign_ctx, sm2.sm2_key, id_str, C.strlen(id_str)) != 1 {
+		if C.sm2_sign_init(&ret.sm2_sign_ctx, &sm2.sm2_key, id_str, C.strlen(id_str)) != 1 {
 			return nil, errors.New("Libgmssl inner error")
 		}
 	} else {
-		if C.sm2_verify_init(sm2_sign_ctx, sm2.sm2_key, id_str, C.strlen(id_str)) != 1 {
+		if C.sm2_verify_init(&ret.sm2_sign_ctx, &sm2.sm2_key, id_str, C.strlen(id_str)) != 1 {
 			return nil, errors.New("Libgmssl inner error")
 		}
 	}
+	ret.sign = sign
+
 	return ret, nil
 }
 
@@ -252,11 +230,11 @@ func (sig *Sm2Signature) Update(data []byte) error {
 		return nil
 	}
 	if sig.sign == true {
-		if C.sm2_sign_update(sig.sm2_sign_ctx, (*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data))) != 1 {
+		if C.sm2_sign_update(&sig.sm2_sign_ctx, (*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data))) != 1 {
 			return errors.New("Libgmssl inner error")
 		}
 	} else {
-		if C.sm2_verify_update(sig.sm2_sign_ctx, (*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data))) != 1 {
+		if C.sm2_verify_update(&sig.sm2_sign_ctx, (*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data))) != 1 {
 			return errors.New("Libgmssl inner error")
 		}
 	}
@@ -269,7 +247,7 @@ func (sig *Sm2Signature) Sign() ([]byte, error) {
 	}
 	outbuf := make([]byte, C.SM2_MAX_SIGNATURE_SIZE)
 	var outlen C.size_t
-	if C.sm2_sign_finish(sig.sm2_sign_ctx, (*C.uchar)(unsafe.Pointer(&outbuf[0])), &outlen) != 1 {
+	if C.sm2_sign_finish(&sig.sm2_sign_ctx, (*C.uchar)(unsafe.Pointer(&outbuf[0])), &outlen) != 1 {
 		return nil, errors.New("Libgmssl inner error")
 	}
 	return outbuf[:outlen], nil
@@ -279,7 +257,7 @@ func (sig *Sm2Signature) Verify(signature []byte) bool {
 	if sig.sign != false {
 		return false
 	}
-	if C.sm2_verify_finish(sig.sm2_sign_ctx, (*C.uchar)(unsafe.Pointer(&signature[0])), C.size_t(len(signature))) != 1 {
+	if C.sm2_verify_finish(&sig.sm2_sign_ctx, (*C.uchar)(unsafe.Pointer(&signature[0])), C.size_t(len(signature))) != 1 {
 		return false
 	}
 	return true

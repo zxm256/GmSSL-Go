@@ -14,10 +14,10 @@ package gmssl
 */
 import "C"
 
-func GetVersions() []string {
-	versions := []string {
-		"GmSSL Go API 2.0",
-		C.GoString(C.gmssl_version_str()),
-	}
-	return versions
+const (
+	GmSSLGoVersion = "2.1.0"
+)
+
+func GetGmSSLLibraryVersion() string {
+	return C.GoString(C.gmssl_version_str())
 }

@@ -17,154 +17,114 @@ package gmssl
 #include <gmssl/mem.h>
 #include <gmssl/pbkdf2.h>
 #include <gmssl/error.h>
-
-SM3_CTX *sm3_ctx_new(void) {
-	SM3_CTX *sm3_ctx;
-	if (!(sm3_ctx = (SM3_CTX *)malloc(sizeof(SM3_CTX)))) {
-		error_print();
-		return NULL;
-	}
-	return sm3_ctx;
-}
-
-void sm3_ctx_free(SM3_CTX *sm3_ctx) {
-	if (sm3_ctx) {
-		gmssl_secure_clear(sm3_ctx, sizeof(SM3_CTX));
-		free(sm3_ctx);
-	}
-}
-
-SM3_HMAC_CTX *sm3_hmac_ctx_new(void) {
-	SM3_HMAC_CTX *sm3_hmac_ctx;
-	if (!(sm3_hmac_ctx = (SM3_HMAC_CTX *)malloc(sizeof(SM3_HMAC_CTX)))) {
-		error_print();
-		return NULL;
-	}
-	return sm3_hmac_ctx;
-}
-
-void sm3_hmac_ctx_free(SM3_HMAC_CTX *sm3_hmac_ctx) {
-	if (sm3_hmac_ctx) {
-		gmssl_secure_clear(sm3_hmac_ctx, sizeof(SM3_HMAC_CTX));
-		free(sm3_hmac_ctx);
-	}
-}
 */
 import "C"
 
 import (
 	"errors"
 	"unsafe"
-	"runtime"
 )
 
-const Sm3DigestSize = 32
+const (
+	Sm3DigestSize = 32
+
+	Sm3HmacMinKeySize = 16
+	Sm3HmacMaxKeySize = 64
+	Sm3HmacSize = 32
+
+	Sm3Pbkdf2MinIter = 10000
+	Sm3Pbkdf2MaxIter = 16777216
+	Sm3Pbkdf2MaxSaltSize = 64
+	Sm3Pbkdf2DefaultSaltSize = 8
+	Sm3Pbkdf2MaxKeySize = 256
+)
 
 
-
-type SM3Context struct {
-	sm3_ctx *C.SM3_CTX
+type Sm3 struct {
+	sm3_ctx C.SM3_CTX
 }
 
+func NewSm3() *Sm3 {
+	sm3 := new(Sm3)
+	C.sm3_init(&sm3.sm3_ctx)
+	return sm3
+}
 
-func NewSM3Context() (*SM3Context, error) {
-	sm3_ctx := C.sm3_ctx_new()
-	if sm3_ctx == nil {
-		return nil, errors.New("Malloc error")
+func (sm3 *Sm3) Update(data []byte) {
+	if len(data) > 0 {
+		C.sm3_update(&sm3.sm3_ctx, (*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data)));
 	}
-	ret := &SM3Context{sm3_ctx}
-	runtime.SetFinalizer(ret, func(ret *SM3Context) {
-		C.sm3_ctx_free(ret.sm3_ctx)
-	})
-	C.sm3_init(sm3_ctx)
-	return ret, nil
 }
 
-func (ctx *SM3Context) Update(data []byte) error {
-	if len(data) == 0 {
-		return nil
-	}
-	C.sm3_update(ctx.sm3_ctx, (*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data)));
-	return nil
+func (sm3 *Sm3) Digest() []byte {
+	dgst := make([]byte, Sm3DigestSize)
+	C.sm3_finish(&sm3.sm3_ctx, (*C.uchar)(unsafe.Pointer(&dgst[0])))
+	return dgst
 }
 
-func (ctx *SM3Context) Finish() ([]byte, error) {
-	outbuf := make([]byte, 32)
-	C.sm3_finish(ctx.sm3_ctx, (*C.uchar)(unsafe.Pointer(&outbuf[0])))
-	return outbuf, nil
+func (sm3 *Sm3) Reset() {
+	C.sm3_init(&sm3.sm3_ctx)
 }
 
-func (ctx *SM3Context) Reset() error {
-	C.sm3_init(ctx.sm3_ctx)
-	return nil
+
+type Sm3Hmac struct {
+	sm3_hmac_ctx C.SM3_HMAC_CTX
 }
 
-const Sm3HmacMinKeySize = 16
-const Sm3HmacMaxKeySize = 64
-const Sm3HmacSize = 32
-
-type SM3HMACContext struct {
-	sm3_hmac_ctx *C.SM3_HMAC_CTX
-}
-
-func NewSM3HMACContext(key []byte) (*SM3HMACContext, error) {
-	sm3_hmac_ctx := C.sm3_hmac_ctx_new()
-	if sm3_hmac_ctx == nil {
-		return nil, errors.New("Malloc error")
-	}
-	ret := &SM3HMACContext{sm3_hmac_ctx}
-	runtime.SetFinalizer(ret, func(ret *SM3HMACContext) {
-		C.sm3_hmac_ctx_free(ret.sm3_hmac_ctx)
-	})
-	if len(key) < 1 || len(key) > 64 {
+func NewSm3Hmac(key []byte) (*Sm3Hmac, error) {
+	if len(key) < Sm3HmacMinKeySize || len(key) > Sm3HmacMaxKeySize {
 		return nil, errors.New("Invalid key length")
 	}
-	C.sm3_hmac_init(sm3_hmac_ctx, (*C.uchar)(unsafe.Pointer(&key[0])), C.size_t(len(key)))
-	return ret, nil
+	hmac := new(Sm3Hmac)
+	C.sm3_hmac_init(&hmac.sm3_hmac_ctx, (*C.uchar)(unsafe.Pointer(&key[0])), C.size_t(len(key)))
+	return hmac, nil
 }
 
-func (ctx *SM3HMACContext) Update(data []byte) error {
-	if len(data) == 0 {
-		return nil
+func (hmac *Sm3Hmac) Update(data []byte) {
+	if len(data) > 0 {
+		C.sm3_hmac_update(&hmac.sm3_hmac_ctx, (*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data)))
 	}
-	C.sm3_hmac_update(ctx.sm3_hmac_ctx, (*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data)))
+}
+
+func (hmac *Sm3Hmac) GenerateMac() []byte {
+	mac := make([]byte, Sm3HmacSize)
+	C.sm3_hmac_finish(&hmac.sm3_hmac_ctx, (*C.uchar)(unsafe.Pointer(&mac[0])))
+	return mac
+}
+
+func (hmac *Sm3Hmac) Reset(key []byte) error {
+	if len(key) < Sm3HmacMinKeySize || len(key) > Sm3HmacMaxKeySize {
+		return errors.New("Invalid key length")
+	}
+	C.sm3_hmac_init(&hmac.sm3_hmac_ctx, (*C.uchar)(unsafe.Pointer(&key[0])), C.size_t(len(key)))
 	return nil
 }
-
-func (ctx *SM3HMACContext) Finish() ([]byte, error) {
-	outbuf := make([]byte, 32)
-	C.sm3_hmac_finish(ctx.sm3_hmac_ctx, (*C.uchar)(unsafe.Pointer(&outbuf[0])))
-	return outbuf, nil
-}
-
-func (ctx *SM3HMACContext) Reset(key []byte) error {
-	if len(key) < 1 || len(key) > 64 {
-		return errors.New("Malloc error")
-	}
-	C.sm3_hmac_init(ctx.sm3_hmac_ctx, (*C.uchar)(unsafe.Pointer(&key[0])), C.size_t(len(key)))
-	return nil
-}
-
-
-const Sm3Pbkdf2MinIter = 10000
-const Sm3Pbkdf2MaxIter = 16777216
-const Sm3Pbkdf2MaxSaltSize = 64
-const Sm3Pbkdf2DefaultSaltSize = 8
-const Sm3Pbkdf2MaxKeySize = 256
 
 
 func Sm3Pbkdf2(pass string, salt []byte, iter uint, keylen uint) ([]byte, error) {
 
+	if len(salt) > Sm3Pbkdf2MaxSaltSize {
+		return nil, errors.New("Invalid salt size")
+	}
+
+	if iter < Sm3Pbkdf2MinIter || iter > Sm3Pbkdf2MaxIter {
+		return nil, errors.New("Invalid iter value")
+	}
+
+	if keylen > Sm3Pbkdf2MaxKeySize {
+		return nil, errors.New("Invalid key length")
+	}
+
 	pass_str := C.CString(pass)
 	defer C.free(unsafe.Pointer(pass_str))
 
-	keybuf := make([]byte, keylen)
+	key := make([]byte, keylen)
 
 	C.pbkdf2_hmac_sm3_genkey(pass_str, C.strlen(pass_str),
 		(*C.uchar)(unsafe.Pointer(&salt[0])), C.size_t(len(salt)),
 		C.size_t(iter), C.size_t(keylen),
-		(*C.uchar)(unsafe.Pointer(&keybuf[0])))
+		(*C.uchar)(unsafe.Pointer(&key[0])))
 
-	return keybuf, nil
+	return key, nil
 }
 

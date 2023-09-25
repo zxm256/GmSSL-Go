@@ -196,18 +196,13 @@ func (cert *Sm2Certificate) GetSubject() ([]byte, map[string]string, error) {
 
 func (cert *Sm2Certificate) GetSubjectPublicKey() (*Sm2Key, error) {
 
-	sm2_key := (*C.SM2_KEY)(unsafe.Pointer(C.malloc(C.sizeof_SM2_KEY)))
-	if sm2_key == nil {
-		return nil, errors.New("Malloc failure")
-	}
-	ret := &Sm2Key{sm2_key, false}
-	runtime.SetFinalizer(ret, func(ret *Sm2Key) {
-		C.free(unsafe.Pointer(ret.sm2_key))
-	})
+	ret := new(Sm2Key)
 
-	if C.x509_cert_get_subject_public_key(cert.cert, cert.certlen, sm2_key) != 1 {
+	if C.x509_cert_get_subject_public_key(cert.cert, cert.certlen, &ret.sm2_key) != 1 {
 		return nil, errors.New("Libgmssl inner error")
 	}
+	ret.has_private_key = false
+
 	return ret, nil
 }
 
